@@ -1,0 +1,207 @@
+---
+title: "Market Basket Analysis"
+author: "Katherine Piatti"
+date: "3/19/2021"
+output: html_document
+ 
+  
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+INTRODUCTION
+===========================================================
+
+Blackwell Electronics' board of directors is considering acquiring Electronidex, a start-up electronics online retailer. The board of directors has asked us to help them better understand the clientele that Electronidex currently is serving and if it would be an optimal partnership. Some questions to consider:
+
+  - Are there any interesting patterns or item relationships within Electronidex's transactions?
+  - Would Blackwell benefit from selling any of Electronidex's items?
+  - In your opinion, should Blackwell acquire Electronidex?
+  - If Blackwell does acquire Electronidex, do you have any recommendations for Blackwell? (Ex: cross-selling items, sale promotions, should they remove items, etc.)
+
+
+## Business Need
+
+They need our help to identify purchasing patterns that will provide insight into Electronidex's clientele. 
+
+
+## Objectives
+
+- Conduct a *market basket analysis* to discover any interesting relationships (or associations) between customers' transactions and the item(s) they purchased. 
+
+
+
+## Load Packages
+
+```{r, message= FALSE, warning=FALSE}
+#load standard pkgs
+library(tidyverse)
+library(here)
+library(janitor)
+library(skimr)
+library(ggplot2)
+library(reader)
+library(kableExtra)
+
+#load pkgs for market basket analysis
+library(arules)
+library(arulesViz)
+```
+
+
+
+## Import Data
+```{r}
+#read in transnational data using read.transactions() from arules pkg
+df_transactions <- read.transactions(
+  here('Data', 'ElectronidexTransactions2017.csv'),
+  format = 'basket',
+  sep = ',',
+  rm.duplicates = TRUE)
+```
+
+```{r}
+# verify import
+(df_transactions)
+```
+
+
+## Metadata
+
+- Dataset contains transaction data from 30 days of Electronidex's online transactions in 2017.
+- Data is represented in sparse matix with 9,835 rows (transactions) and 125 columns (items.).
+- Also sent PDF list with 125 items divided into 17 product categories (e.g. laptops, desktops, monitors, computer mice)
+
+
+
+
+
+
+DATA EXPLORATION
+==============================================================
+
+## Overview
+
+```{r}
+# return summary info about the dataset
+summary(df_transactions)
+```
+
+>*Notes*
+>
+- 5 most freqently bought items: iMac, HP laptop, Cyberpower gamer desktop, apple earpods, apple macbook. 
+- Most transactions are for 1-4 items.
+- The most items purchased in one transaction is 30, the minimum is 0 (only 2), the median is 3, the mean is 4.383.
+- There is no additional (extended) item information
+
+
+
+
+## Inspect Ununsual Transactions
+
+```{r}
+# inspect 0 length transactions
+inspect(df_transactions[size(df_transactions) == 0])
+```
+
+```{r, include=FALSE}
+options(width = 60)
+local({
+  hook_output <- knitr::knit_hooks$get('output')
+  knitr::knit_hooks$set(output = function(x, options) {
+    if (!is.null(options$max.height)) options$attr.output <- c(
+      options$attr.output,
+      sprintf('style="max-height: %s;"', options$max.height)
+    )
+    hook_output(x, options)
+  })
+})
+```
+
+
+```{r, max.height='100px'}
+# inspect transactions with 22 or more items
+inspect(df_transactions[size(df_transactions) > 21])
+```
+
+>*Notes*
+>
+- All these transactions involve multiple desktop/laptop computers--maybe some kind of distributor/wholesaler?
+
+
+
+## Mose Frequent Items
+```{r}
+# plot most frequent items
+itemFrequencyPlot(df_transactions, 
+                  topN = 20, 
+                  type = 'absolute',
+                  cex.names = 0.8) #reduce label size (easier reading)
+```
+
+>*Notes*
+>
+- The above bar chart shows the 4 most frequent products (i.e. in the most transactions) that we identified when reading the3 summary output.
+- 17/20 of the most frequent items are computer hardware--i.e. desktops, laptops, and computer accessories (monitors, keyboards, mice, etc.).
+- 5
+- Apple has the most products in the top 20 (5/20). 
+
+
+
+
+
+
+
+
+
+
+
+MINE ASSOCIATION RULES
+=====================================================================
+
+```{r}
+# find all potentially valuable association rules 
+ruleset_01 <- df_transactions %>% 
+  apriori(parameter = list(supp = 0.01, conf = 0.15))
+
+summary(ruleset_01)
+```
+
+With support and confidence set very low, the algorithm found 388 rules. Let's examine a subset of the rules with the highest confidence.
+
+```{r}
+ruleset_01 %>% 
+  sort(by = 'confidence') %>% 
+  head() %>% 
+  inspect()
+```
+
+Let's get only those rules with a lift greater than 1.
+
+
+```{r}
+# use apriori function to find association rules 
+ruleset_02 <- df_transactions %>% 
+  apriori(parameter = list(supp = 0.04, conf = 0.15))
+
+ruleset_02 %>%
+  inspect() %>%
+  kbl() %>%
+  kable_paper('striped', 'condensed', font_size = 10)
+```
+
+
+
+
+
+
+
+
+
+
